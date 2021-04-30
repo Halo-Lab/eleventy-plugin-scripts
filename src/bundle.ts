@@ -5,9 +5,9 @@ import { build } from 'esbuild';
 import { pathStats } from './path_stats';
 import { isProduction } from './is_production';
 import { makeDirectories } from './mkdir';
+import { SCRIPTS_LINK_REGEXP } from './constants';
 import { ScriptsPluginOptions } from './types';
 import { done, oops, start, bold } from './pretty';
-import { PLUGIN_NAME, SCRIPTS_LINK_REGEXP } from './constants';
 
 type BundleOptions = Required<Omit<ScriptsPluginOptions, 'addWatchTarget'>>;
 
@@ -20,10 +20,7 @@ const findAndProcessFiles = (
 
   return rip(html, SCRIPTS_LINK_REGEXP).map(
     async (publicSourcePathToScript) => {
-      start(
-        PLUGIN_NAME,
-        `Start compiling "${bold(publicSourcePathToScript)}" file.`
-      );
+      start(`Start compiling "${bold(publicSourcePathToScript)}" file.`);
 
       const absolutePathToScript = resolve(
         inputDirectory,
@@ -50,7 +47,6 @@ const findAndProcessFiles = (
         )
         .then(() =>
           done(
-            PLUGIN_NAME,
             `Compiled "${bold(
               publicSourcePathToScript
             )}" script was written to "${bold(
@@ -75,21 +71,26 @@ export const bundle = async (
   outputPath: string,
   options: BundleOptions
 ) =>
-  Promise.all(findAndProcessFiles(html, outputPath, options)).then(
-    (validUrls) => {
-      const htmlWithScripts = validUrls.reduce(
-        (text, { input, output }) => text.replace(input, output),
-        html
-      );
+  Promise.all(findAndProcessFiles(html, outputPath, options))
+    .then((array) => array.filter(Boolean))
+    .then(
+      (validUrls) => {
+        const htmlWithScripts = validUrls.reduce(
+          (text, { input, output }) => text.replace(input, output),
+          html
+        );
 
-      done(
-        PLUGIN_NAME,
-        `${validUrls.map(({ output }) => `"${bold(output)}"`).join(', ')} URL${
-          validUrls.length === 1 ? ' was' : 's were'
-        } injected into "${bold(outputPath)}"`
-      );
+        if (validUrls.length > 0) {
+          done(
+            `${validUrls
+              .map(({ output }) => `"${bold(output)}"`)
+              .join(', ')} URL${
+              validUrls.length === 1 ? ' was' : 's were'
+            } injected into "${bold(outputPath)}"`
+          );
+        }
 
-      return htmlWithScripts;
-    },
-    (error) => (oops(PLUGIN_NAME, error), html)
-  );
+        return htmlWithScripts;
+      },
+      (error) => (oops(error), html)
+    );

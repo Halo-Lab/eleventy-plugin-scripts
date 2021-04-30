@@ -9,7 +9,7 @@ import {
 
 /**
  * Plugin that searches for links to scripts inside HTML,
- * compiles and minificates them. After that - writes
+ * compiles and minifies them. After that - writes
  * to the _output_ directory.
  */
 export const scripts = (
