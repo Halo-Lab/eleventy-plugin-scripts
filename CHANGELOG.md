@@ -3,7 +3,7 @@
 ### Fixed
 
 - Recompilation of scripts on every change inside project.
-- Reapeated compilation of the same files if it is referenced from two or more files.
+- Repeated compilation of the same files if it is referenced from two or more files.
 
 ## [1.0.1] - 2021-04-30
 
