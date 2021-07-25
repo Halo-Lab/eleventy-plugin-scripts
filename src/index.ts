@@ -1,7 +1,8 @@
 import { join } from 'path';
 
-import { bundle } from './bundle';
+import { done } from './pretty';
 import { ScriptsPluginOptions } from './types';
+import { bundle, transformFile } from './bundle';
 import {
   DEFAULT_SOURCE_DIRECTORY,
   DEFAULT_SCRIPTS_DIRECTORY,
@@ -21,15 +22,36 @@ export const scripts = (
     addWatchTarget = true,
   }: ScriptsPluginOptions = {}
 ) => {
-  config.addTransform('scripts', async (content: string, outputPath: string) =>
-    outputPath.endsWith('html')
-      ? bundle(content, outputPath, {
-          inputDirectory,
-          publicDirectory,
-          esbuildOptions,
-        })
-      : content
+  config.addTransform(
+    'scripts',
+    async function (
+      this: Record<string, any>,
+      content: string,
+      outputPath: string
+    ) {
+      const output = this.outputPath ?? outputPath;
+
+      return output.endsWith('html')
+        ? bundle(content, output, {
+            inputDirectory,
+            publicDirectory,
+            esbuildOptions,
+          })
+        : content;
+    }
   );
+
+  config.on('beforeWatch', (changedFiles: ReadonlyArray<string>) => {
+    if (
+      changedFiles.some(
+        (file) => file.includes(inputDirectory) && /(ts|js)$/.test(file)
+      )
+    ) {
+      transformFile.cache.clear();
+    } else {
+      done('No script file was changed. Skip compilation.');
+    }
+  });
 
   if (addWatchTarget) {
     config.addWatchTarget(inputDirectory);

@@ -1,6 +1,6 @@
 {
   "name": "eleventy-plugin-scripts",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Plugin to process scripts from HTML.",
   "main": "index.js",
   "exports": {
@@ -30,17 +30,21 @@
   "author": "Kapelianovych Yevhen",
   "license": "ISC",
   "devDependencies": {
+    "@rollup/plugin-node-resolve": "^13.0.4",
     "@rollup/plugin-typescript": "^8.2.1",
     "cpy-cli": "^3.1.1",
-    "prettier": "^2.2.1",
+    "prettier": "^2.3.0",
     "rimraf": "^3.0.2",
     "rollup": "^2.45.2",
     "rollup-plugin-terser": "^7.0.2",
-    "tslib": "^2.2.0",
-    "typescript": "^4.2.4"
+    "tslib": "^2.3.0",
+    "typescript": "^4.3.5"
   },
   "peerDependencies": {
     "chalk": "^4.1.0",
     "esbuild": "^0.11.0"
+  },
+  "dependencies": {
+    "@fluss/core": "^0.28.0"
   }
 }

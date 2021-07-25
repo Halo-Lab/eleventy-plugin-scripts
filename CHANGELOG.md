@@ -1,4 +1,11 @@
-# [1.0.1] - 2021-04-30
+# [1.0.2] - 2021-07-25
+
+### Fixed
+
+- Recompilation of scripts on every change inside project.
+- Reapeated compilation of the same files if it is referenced from two or more files.
+
+## [1.0.1] - 2021-04-30
 
 ### Changed
 

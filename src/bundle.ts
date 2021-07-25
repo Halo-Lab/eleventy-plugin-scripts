@@ -1,7 +1,9 @@
 import { join, resolve, dirname } from 'path';
 
-import { rip } from './rip';
 import { build } from 'esbuild';
+import { memoize, pipe } from '@fluss/core';
+
+import { rip } from './rip';
 import { pathStats } from './path_stats';
 import { isProduction } from './is_production';
 import { makeDirectories } from './mkdir';
@@ -11,6 +13,60 @@ import { done, oops, start, bold } from './pretty';
 
 type BundleOptions = Required<Omit<ScriptsPluginOptions, 'addWatchTarget'>>;
 
+interface TransformFileOptions extends BundleOptions {
+  readonly nestedHTMLPath: ReadonlyArray<string>;
+  readonly buildDirectory: string;
+  readonly publicSourcePathToScript: string;
+}
+
+export const transformFile = memoize(
+  ({
+    inputDirectory,
+    nestedHTMLPath,
+    buildDirectory,
+    esbuildOptions,
+    publicDirectory,
+    publicSourcePathToScript,
+  }: TransformFileOptions) => {
+    start(`Start compiling "${bold(publicSourcePathToScript)}" file.`);
+
+    const absolutePathToScript = resolve(
+      inputDirectory,
+      publicSourcePathToScript
+    );
+    const publicOutputPathToScript = join(
+      publicDirectory,
+      publicSourcePathToScript.replace(/ts$/, 'js')
+    );
+
+    return pipe(
+      () => resolve(buildDirectory, publicOutputPathToScript),
+      dirname,
+      makeDirectories,
+      () =>
+        void build({
+          bundle: true,
+          target: 'es2017',
+          minify: isProduction(),
+          outfile: resolve(buildDirectory, publicOutputPathToScript),
+          sourcemap: !isProduction(),
+          entryPoints: [absolutePathToScript],
+          ...esbuildOptions,
+        }),
+      () =>
+        void done(
+          `Compiled "${bold(
+            publicSourcePathToScript
+          )}" script was written to "${bold(
+            join(buildDirectory, publicOutputPathToScript)
+          )}"`
+        ),
+      () => join(...nestedHTMLPath.map(() => '..'), publicOutputPathToScript)
+    )();
+  },
+  ({ publicSourcePathToScript }) => publicSourcePathToScript
+);
+
 const findAndProcessFiles = (
   html: string,
   outputPath: string,
@@ -18,50 +74,15 @@ const findAndProcessFiles = (
 ) => {
   const [buildDirectory, ...nestedHTMLPath] = pathStats(outputPath).directories;
 
-  return rip(html, SCRIPTS_LINK_REGEXP).map(
-    async (publicSourcePathToScript) => {
-      start(`Start compiling "${bold(publicSourcePathToScript)}" file.`);
-
-      const absolutePathToScript = resolve(
-        inputDirectory,
-        publicSourcePathToScript
-      );
-      const publicOutputPathToScript = join(
-        publicDirectory,
-        publicSourcePathToScript.replace(/ts$/, 'js')
-      );
-
-      return makeDirectories(
-        dirname(resolve(buildDirectory, publicOutputPathToScript))
-      )
-        .then(() =>
-          build({
-            bundle: true,
-            target: 'es2017',
-            minify: isProduction(),
-            outfile: resolve(buildDirectory, publicOutputPathToScript),
-            sourcemap: !isProduction(),
-            entryPoints: [absolutePathToScript],
-            ...esbuildOptions,
-          })
-        )
-        .then(() =>
-          done(
-            `Compiled "${bold(
-              publicSourcePathToScript
-            )}" script was written to "${bold(
-              join(buildDirectory, publicOutputPathToScript)
-            )}"`
-          )
-        )
-        .then(() => ({
-          input: publicSourcePathToScript,
-          output: join(
-            ...nestedHTMLPath.map(() => '..'),
-            publicOutputPathToScript
-          ),
-        }));
-    }
+  return rip(html, SCRIPTS_LINK_REGEXP).map((link) =>
+    transformFile({
+      inputDirectory,
+      publicDirectory,
+      esbuildOptions,
+      buildDirectory,
+      nestedHTMLPath,
+      publicSourcePathToScript: link,
+    }).then((output) => ({ input: link, output }))
   );
 };
 
