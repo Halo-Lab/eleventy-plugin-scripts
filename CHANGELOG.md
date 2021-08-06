@@ -1,4 +1,15 @@
-# [1.0.2] - 2021-07-25
+# [1.1.0] - 2021-08-06
+
+### Added
+
+- Code splitting ability though dynamic `import`.
+
+### Changed
+
+- JavaScript is bundled in `ES2018` ECMAScript version and as ES modules, by default.
+- Minimal version of `esbuild` is changed to `0.12.0`.
+
+## [1.0.2] - 2021-07-25
 
 ### Fixed
 

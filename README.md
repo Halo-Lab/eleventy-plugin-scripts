@@ -74,7 +74,7 @@ For example:
 
 ```html
 <!-- Note that we wrote `main.ts` 👇 -->
-<script src="main.ts"></script>
+<script type="module" src="main.ts"></script>
 ```
 
 > Plugin recognizes followed extensions: `js` and `ts`. In future may be added much more if you will need it 🤓
@@ -95,7 +95,7 @@ Plugin will assume that path of script file is `src/scripts/main.ts` 🎉 And af
 
 ```html
 <!-- If HTML file is in the same directory if main.js -->
-<script src="main.js"></script>
+<script type="module" src="main.js"></script>
 ```
 
 > `_site` is used just for example. Actually [name of the directory will be up to you](https://www.11ty.dev/docs/config/#output-directory) - plugin will know about it.
@@ -137,7 +137,7 @@ module.exports = (eleventyConfig) => {
 
 ### esbuildOptions
 
-Internally for bundling scripts is responsible [`esbuild`](https://esbuild.github.io). It bundles each script with all dependencies, that you will reference from templates, into one [ES2017]-compliant file.
+Internally for bundling scripts is responsible [`esbuild`](https://esbuild.github.io). It bundles each script with all dependencies, that you will reference from templates, into one [ES2018]-compliant file.
 
 You customize its behavior by providing [build options](https://esbuild.github.io/api/#simple-options).
 

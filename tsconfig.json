@@ -1,7 +1,8 @@
 {
   "compilerOptions": {
     "strict": true,
-    "target": "ES2017",
+    "target": "ESNext",
+    "module": "ESNext",
     "declaration": true,
     "declarationDir": "build",
     "moduleResolution": "node",

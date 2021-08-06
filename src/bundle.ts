@@ -1,15 +1,18 @@
-import { join, resolve, dirname } from 'path';
+import { promises } from 'fs';
+import { join, dirname, resolve } from 'path';
 
-import { build } from 'esbuild';
 import { memoize, pipe } from '@fluss/core';
+import { build, BuildResult } from 'esbuild';
 
 import { rip } from './rip';
 import { pathStats } from './path_stats';
 import { isProduction } from './is_production';
 import { makeDirectories } from './mkdir';
-import { SCRIPTS_LINK_REGEXP } from './constants';
 import { ScriptsPluginOptions } from './types';
 import { done, oops, start, bold } from './pretty';
+import { SCRIPTS_LINK_REGEXP, URL_DELIMITER } from './constants';
+
+const { writeFile } = promises;
 
 type BundleOptions = Required<Omit<ScriptsPluginOptions, 'addWatchTarget'>>;
 
@@ -30,47 +33,60 @@ export const transformFile = memoize(
   }: TransformFileOptions) => {
     start(`Start compiling "${bold(publicSourcePathToScript)}" file.`);
 
-    const absolutePathToScript = resolve(
-      inputDirectory,
-      publicSourcePathToScript
-    );
-    const publicOutputPathToScript = join(
-      publicDirectory,
-      publicSourcePathToScript.replace(/ts$/, 'js')
-    );
+    const pathToScriptFromRoot = join(inputDirectory, publicSourcePathToScript);
+    const publicFileName = publicSourcePathToScript.replace(/ts$/, 'js');
 
     return pipe(
-      () => resolve(buildDirectory, publicOutputPathToScript),
+      () => resolve(buildDirectory, publicDirectory, publicSourcePathToScript),
       dirname,
       makeDirectories,
       () =>
-        void build({
+        build({
+          write: false,
           bundle: true,
-          target: 'es2017',
+          target: 'es2018',
           minify: isProduction(),
-          outfile: resolve(buildDirectory, publicOutputPathToScript),
+          outdir: join(buildDirectory, publicDirectory),
+          outbase: inputDirectory,
+          format: 'esm',
+          splitting: true,
           sourcemap: !isProduction(),
-          entryPoints: [absolutePathToScript],
+          entryPoints: [pathToScriptFromRoot],
           ...esbuildOptions,
         }),
-      () =>
-        void done(
-          `Compiled "${bold(
-            publicSourcePathToScript
-          )}" script was written to "${bold(
-            join(buildDirectory, publicOutputPathToScript)
-          )}"`
+      ({ outputFiles = [] }: BuildResult) =>
+        outputFiles.map((file) =>
+          writeFile(file.path, file.text).then(() => file.path),
         ),
-      () => join(...nestedHTMLPath.map(() => '..'), publicOutputPathToScript)
+      (paths) => Promise.all(paths),
+      (paths: ReadonlyArray<string>) =>
+        void done(
+          `Compiled "${bold(publicSourcePathToScript)}" script${
+            paths.length > 1 ? 's were' : 'was'
+          } written to "${bold(
+            paths
+              // We get rid of "map" file.
+              .filter((pathPart) => !pathPart.endsWith('.map'))
+              .map((pathPart) => pathPart.replace(process.cwd(), ''))
+              .join(', '),
+          )}"`,
+        ),
+      () =>
+        nestedHTMLPath
+          .map(() => '..')
+          .concat(publicDirectory)
+          .concat(publicFileName)
+          .filter(Boolean)
+          .join(URL_DELIMITER),
     )();
   },
-  ({ publicSourcePathToScript }) => publicSourcePathToScript
+  ({ publicSourcePathToScript }) => publicSourcePathToScript,
 );
 
 const findAndProcessFiles = (
   html: string,
   outputPath: string,
-  { inputDirectory, esbuildOptions, publicDirectory }: BundleOptions
+  { inputDirectory, esbuildOptions, publicDirectory }: BundleOptions,
 ) => {
   const [buildDirectory, ...nestedHTMLPath] = pathStats(outputPath).directories;
 
@@ -82,7 +98,10 @@ const findAndProcessFiles = (
       buildDirectory,
       nestedHTMLPath,
       publicSourcePathToScript: link,
-    }).then((output) => ({ input: link, output }))
+    }).then((output) => ({
+      output,
+      input: link,
+    })),
   );
 };
 
@@ -90,7 +109,7 @@ const findAndProcessFiles = (
 export const bundle = async (
   html: string,
   outputPath: string,
-  options: BundleOptions
+  options: BundleOptions,
 ) =>
   Promise.all(findAndProcessFiles(html, outputPath, options))
     .then((array) => array.filter(Boolean))
@@ -98,7 +117,7 @@ export const bundle = async (
       (validUrls) => {
         const htmlWithScripts = validUrls.reduce(
           (text, { input, output }) => text.replace(input, output),
-          html
+          html,
         );
 
         if (validUrls.length > 0) {
@@ -107,11 +126,11 @@ export const bundle = async (
               .map(({ output }) => `"${bold(output)}"`)
               .join(', ')} URL${
               validUrls.length === 1 ? ' was' : 's were'
-            } injected into "${bold(outputPath)}"`
+            } injected into "${bold(outputPath)}"`,
           );
         }
 
         return htmlWithScripts;
       },
-      (error) => (oops(error), html)
+      (error) => (oops(error), html),
     );
